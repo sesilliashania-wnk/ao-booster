@@ -428,9 +428,11 @@ function monthCutoffs(cal, mode){
       res[mk] = {cutoff: all[all.length-1], k: W, W};
       continue;
     }
-    let k = (mk === cal.current.mk) ? cal.current.elapsed : Math.round(cal.current.tg * W);
+    // dibulatkan ke atas: hari kerja yang baru terlewat sebagian dihitung penuh
+    // (toleransi 1e-9 agar 24,000000001 tidak menjadi 25)
+    let k = (mk === cal.current.mk) ? cal.current.elapsed : Math.ceil(cal.current.tg * W - 1e-9);
     k = Math.max(1, Math.min(W, k));
-    res[mk] = {cutoff: wk[k-1], k, W};
+    res[mk] = {cutoff: wk[k-1], k, W: (mk === cal.current.mk) ? cal.current.total : W};
   }
   return res;
 }
