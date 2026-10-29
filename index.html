@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>AO Booster Dashboard</title>
+<style>
+  :root{
+    --bg:#f3f5f4; --surface:#ffffff; --surface-2:#f7f9f8; --line:#e2e7e5; --line-2:#cfd8d4;
+    --ink:#17211d; --ink-2:#4a5853; --ink-3:#7b8984;
+    --brand:#0f6b4f; --brand-2:#0b5540; --brand-soft:#e3f1ec;
+    --pos:#13805b; --pos-soft:#e2f3ec; --neg:#c23a3a; --neg-soft:#fbe8e8;
+    --after:#eaf4ef; --current:#fff6e5; --warn:#a96a00;
+    --radius:12px; --shadow:0 1px 2px rgba(16,40,30,.06),0 1px 1px rgba(16,40,30,.04);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  button,select,input{font:inherit;color:inherit}
+  .num{font-variant-numeric:tabular-nums}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 20px}
+
+  /* header */
+  header{background:var(--brand-2);color:#fff}
+  .hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;flex-wrap:wrap}
+  .hdr h1{margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em}
+  .hdr .sub{font-size:12.5px;color:#bfe0d3;margin-top:2px}
+  .hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .stamp{font-size:12.5px;background:rgba(255,255,255,.1);padding:6px 10px;border-radius:8px;white-space:nowrap}
+  .stamp b{font-weight:650}
+  .tabs{display:flex;gap:4px;padding:0 20px;max-width:1280px;margin:0 auto}
+  .tab{background:none;border:0;color:#bfe0d3;padding:10px 14px;cursor:pointer;border-bottom:3px solid transparent;font-weight:550}
+  .tab[aria-selected="true"]{color:#fff;border-bottom-color:#7fd4b2}
+  .btn{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:550;font-size:13px}
+  .btn:hover{background:var(--surface-2)}
+  .btn-ghost{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:#fff}
+  .btn-ghost:hover{background:rgba(255,255,255,.18)}
+  .btn-primary{background:#fff;color:var(--brand-2);border-color:#fff}
+  .btn-primary:hover{background:#e9f5f0}
+
+  /* filter bar */
+  .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:14px 16px;margin:18px 0 12px;box-shadow:var(--shadow)}
+  .f{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .f label,.f .lbl{font-size:11.5px;font-weight:650;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+  .dd{position:relative}
+  .dd-btn{min-width:210px;max-width:280px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;
+    border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:8px 10px;cursor:pointer}
+  .dd-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dd-menu{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:320px;background:var(--surface);
+    border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(16,40,30,.14);padding:6px;display:none}
+  .dd.open .dd-menu{display:block}
+  .dd-search{width:100%;border:1px solid var(--line-2);border-radius:6px;padding:6px 8px;margin-bottom:4px}
+  .dd-list{max-height:300px;overflow:auto}
+  .dd-item{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13.5px}
+  .dd-item:hover{background:var(--surface-2)}
+  .dd-item.all{font-weight:650;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;margin-bottom:2px}
+  .dd-item input{accent-color:var(--brand)}
+  .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+  .seg button{border:0;background:var(--surface);padding:8px 12px;cursor:pointer;font-weight:550;font-size:13px;white-space:nowrap}
+  .seg button+button{border-left:1px solid var(--line-2)}
+  .seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
+  select.sel{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:8px 10px}
+  .context{font-size:12.5px;color:var(--ink-2);margin:0 2px 14px;display:flex;flex-wrap:wrap;gap:6px 16px}
+  .context b{color:var(--ink)}
+  .pill{display:inline-block;background:var(--current);color:var(--warn);border-radius:999px;padding:1px 8px;font-weight:600;font-size:11.5px}
+
+  /* banner */
+  .banner{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .kpi-title{font-size:12px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .kpi-growth{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin-top:4px}
+  .kpi-gap{font-size:13px;color:var(--ink-2);margin-top:2px}
+  .kpi-grid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;align-items:baseline}
+  .kpi-grid .h{font-size:11px;font-weight:650;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+  .kpi-grid .r{color:var(--ink-2)}
+  .kpi-grid .v{font-weight:600;text-align:right}
+  .kpi-note{font-size:11.5px;color:var(--ink-3);margin-top:8px}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--ink-3)}
+
+  /* cards */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .card h2{margin:0;font-size:15.5px;font-weight:650}
+  .card .desc{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .legend{display:flex;gap:12px;font-size:12px;color:var(--ink-2);align-items:center;flex-wrap:wrap}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  svg text{font-family:inherit}
+
+  /* tables */
+  .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:8px 10px;white-space:nowrap}
+  thead th{background:var(--surface-2);color:var(--ink-2);font-weight:650;font-size:12px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
+  thead tr.grp th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);border-bottom:0;padding-bottom:2px}
+  tbody tr+tr td{border-top:1px solid #eef2f0}
+  td.n,th.n{text-align:right}
+  tbody tr:hover td{background:#fafcfb}
+  tr.top td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
+  tr.bot td:first-child{box-shadow:inset 3px 0 0 var(--neg)}
+  tr.total td{font-weight:700;background:var(--surface-2);border-top:2px solid var(--line-2)}
+  .sep{border-left:1px solid var(--line)}
+  .rk{color:var(--ink-3);font-weight:600}
+  .chip{display:inline-block;font-size:11px;font-weight:650;padding:1px 7px;border-radius:999px}
+  .chip.pos{background:var(--pos-soft)} .chip.neg{background:var(--neg-soft)}
+  th.after,td.after{background:var(--after)}
+  th.current,td.current{background:var(--current)}
+  .period-row th{font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+
+  /* loader */
+  #loader{max-width:620px;margin:60px auto;text-align:center;padding:0 20px}
+  .drop{border:2px dashed var(--line-2);border-radius:14px;padding:30px;background:var(--surface);margin-top:16px}
+  .drop.hover{border-color:var(--brand);background:var(--brand-soft)}
+  .spinner{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err{color:var(--neg);font-weight:600}
+  .hidden{display:none!important}
+  footer{color:var(--ink-3);font-size:12px;padding:6px 0 30px}
+  footer details{margin-top:4px}
+  footer summary{cursor:pointer}
+
+  @media (max-width:860px){
+    .banner{grid-template-columns:1fr}
+    .dd-btn{min-width:170px}
+  }
+  @media (max-width:560px){
+    .wrap{padding:0 12px}
+    .hdr{padding:12px}
+    .tabs{padding:0 12px}
+    .filters{padding:12px}
+    .f,.dd,.dd-btn{width:100%;max-width:none}
+    .kpi-growth{font-size:26px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr wrap">
+    <div>
+      <h1>Dashboard AO Booster</h1>
+      <div class="sub">Pertumbuhan Sales &amp; Active Outlet per Cabang · Before (Jan–Jun) vs After (Jul–Sep)</div>
+    </div>
+    <div class="hdr-right">
+      <span class="stamp hidden" id="stamp"></span>
+      <button class="btn btn-ghost" id="btnLoadFile" title="Muat file CSV dari komputer">Muat file CSV</button>
+      <button class="btn btn-primary hidden" id="btnExport">Export CSV</button>
+    </div>
+  </div>
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" aria-selected="true" data-tab="ringkasan">Ringkasan Cabang</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="trend">Trend Bulanan</button>
+  </div>
+</header>
+<input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+
+<section id="loader">
+  <div id="loadStatus"><div class="spinner"></div><div>Memuat data…</div></div>
+  <div id="dropZone" class="drop hidden">
+    <div style="font-weight:650;margin-bottom:6px">Pilih atau tarik file CSV export Tableau ke sini</div>
+    <div class="muted" style="font-size:13px;margin-bottom:12px">Format: NAMADEPT · Org Code Pass · NMGRLANGLAMA · KODELANG · kolom sales per tanggal</div>
+    <button class="btn" id="btnPick">Pilih file…</button>
+  </div>
+</section>
+
+<main id="app" class="wrap hidden">
+  <div class="filters" id="filters">
+    <div class="f"><span class="lbl">Departemen</span><div class="dd" id="ddDept"></div></div>
+    <div class="f"><span class="lbl">Sales Channel</span><div class="dd" id="ddChan"></div></div>
+    <div class="f"><span class="lbl">Mode Waktu</span>
+      <div class="seg" id="segMode">
+        <button data-v="full" aria-pressed="true">Full Month</button>
+        <button data-v="tg" aria-pressed="false" id="btnModeTG">Time Gone</button>
+      </div>
+    </div>
+    <div class="f"><label for="selAfter">Periode After</label>
+      <select class="sel" id="selAfter"></select>
+    </div>
+    <div class="f" id="fMetric"><span class="lbl">Peringkat Berdasarkan</span>
+      <div class="seg" id="segMetric">
+        <button data-v="sales" aria-pressed="true">Sales Growth</button>
+        <button data-v="ao" aria-pressed="false">AO Growth</button>
+      </div>
+    </div>
+    <div class="f hidden" id="fCab"><label for="selCab">Cabang</label>
+      <select class="sel" id="selCab"></select>
+    </div>
+  </div>
+
+  <div class="context" id="context"></div>
+  <div class="banner" id="banner"></div>
+
+  <div id="tabRingkasan">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2 id="chartTitle">Bottom 3 &amp; Top 3 Cabang</h2>
+          <div class="desc">Diurutkan dari terburuk (kiri) ke terbaik (kanan). Label: Growth % dan Gap (rata-rata After − Before).</div>
+        </div>
+        <div class="legend"><span><i class="sw" style="background:var(--neg)"></i>Bottom 3</span><span><i class="sw" style="background:var(--pos)"></i>Top 3</span></div>
+      </div>
+      <div id="chartTopBottom"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Peringkat Cabang</h2>
+          <div class="desc" id="rankDesc">Nilai rata-rata per bulan. Grand Total di baris paling bawah.</div>
+        </div>
+      </div>
+      <div class="tbl-wrap" id="rankTable"></div>
+    </div>
+  </div>
+
+  <div id="tabTrend" class="hidden">
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Sales per Bulan</h2><div class="desc" id="trendSalesDesc"></div></div>
+        <div class="legend"><span><i class="sw" style="background:#fff;border:1px solid var(--line-2)"></i>Before</span><span><i class="sw" style="background:var(--after)"></i>After (Booster)</span><span><i class="sw" style="background:var(--current)"></i>Bulan berjalan</span></div>
+      </div>
+      <div id="chartSales"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Active Outlet (AO) per Bulan</h2><div class="desc">Outlet unik dengan minimal 1 transaksi positif dalam bulan tersebut.</div></div></div>
+      <div id="chartAO"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Matriks Bulanan</h2><div class="desc" id="matrixDesc"></div></div></div>
+      <div class="tbl-wrap" id="matrix"></div>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>
+/* ==================================================================
+   KONFIGURASI — ubah di sini bila periode / libur nasional berubah
+   ================================================================== */
+const CONFIG = {
+  CSV_URL: 'data_ao_booster.csv',
+  BEFORE_MONTHS: ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'],
+  AFTER_MONTHS:  ['2026-07','2026-08','2026-09'],
+  // Kode outlet yang bukan outlet sungguhan: dikeluarkan dari seluruh perhitungan
+  EXCLUDE_CODES: ['OTHERSB'],
+  // Hari kerja: Senin–Sabtu (0 = Minggu)
+  WORK_DOW: [1,2,3,4,5,6],
+  // Libur nasional (SKB 3 Menteri, tanpa cuti bersama). Hanya dipakai untuk
+  // menghitung sisa hari kerja di bulan berjalan; hari yang sudah lewat
+  // dideteksi otomatis dari data (tanggal tanpa transaksi = libur).
+  HOLIDAYS: ['2026-01-01','2026-01-16','2026-02-17','2026-03-19','2026-03-21','2026-03-22',
+             '2026-04-03','2026-04-05','2026-05-01','2026-05-14','2026-05-27','2026-05-31',
+             '2026-06-01','2026-06-16','2026-08-17','2026-08-25','2026-12-25']
+};
+
+/*ENGINE-START*/
+const MONTH_ID = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const DOW_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+
+function splitLine(line, delim){
+  if (line.indexOf('"') === -1) return line.split(delim);
+  const out = []; let cur = ''; let q = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (q){
+      if (ch === '"'){ if (line[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === delim){ out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur); return out;
+}
+
+function parseNumber(s){
+  s = s.trim();
+  if (s === '') return null;
+  if (/^-?\d+$/.test(s)) return Number(s);
+  if (/^-?\d+[.,]\d+$/.test(s)) return Number(s.replace(',', '.'));
+  // ribuan dengan titik/koma, mis. 1.234.567 atau 1,234,567(.89)
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Number(s.replace(/\./g,'').replace(',', '.'));
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return Number(s.replace(/,/g,''));
+  const n = Number(s); return isNaN(n) ? NaN : n;
+}
+
+const pad2 = n => (n < 10 ? '0' : '') + n;
+const isoOf = (y,m,d) => y + '-' + pad2(m) + '-' + pad2(d);
+
+/** Mengubah teks CSV export Tableau (format ke samping) menjadi model ringkas. */
+function parseTableauCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const lines = text.split(/\r?\n/);
+  while (lines.length && lines[lines.length-1].trim() === '') lines.pop();
+  if (lines.length < 3) throw new Error('File terlalu pendek: butuh 2 baris header + data.');
+  const delim = (lines[1].split(';').length >= lines[1].split(',').length) ? ';' : ',';
+  const h1 = splitLine(lines[0], delim), h2 = splitLine(lines[1], delim);
+
+  const norm = s => (s || '').trim().toUpperCase();
+  const idx = {};
+  const want = {dept:'NAMADEPT', cab:'ORG CODE PASS', chan:'NMGRLANGLAMA', kode:'KODELANG'};
+  for (const k in want){ idx[k] = h2.findIndex(h => norm(h) === want[k]); }
+  const missing = Object.keys(want).filter(k => idx[k] < 0).map(k => want[k]);
+  if (missing.length) throw new Error('Kolom tidak ditemukan di baris header ke-2: ' + missing.join(', '));
+
+  // kolom tanggal: baris 1 "YYYY M" (di-forward-fill), baris 2 nomor tanggal
+  const dateCols = []; let lastYM = null;
+  for (let j = 0; j < h2.length; j++){
+    const a = (h1[j] || '').trim();
+    const mm = a.match(/^(\d{4})\s+(\d{1,2})$/);
+    if (mm) lastYM = [Number(mm[1]), Number(mm[2])];
+    else if (a !== '') lastYM = null;
+    const b = (h2[j] || '').trim();
+    if (lastYM && /^\d{1,2}$/.test(b)){
+      const y = lastYM[0], m = lastYM[1], d = Number(b);
+      const dt = new Date(Date.UTC(y, m-1, d));
+      dateCols.push({col:j, y, m, d, iso:isoOf(y,m,d), mk:y+'-'+pad2(m), dow:dt.getUTCDay()});
+    }
+  }
+  if (!dateCols.length) throw new Error('Tidak ada kolom tanggal yang terbaca (format header "2026 1" / tanggal).');
+  dateCols.sort((p,q) => p.iso < q.iso ? -1 : p.iso > q.iso ? 1 : 0);
+
+  const exclude = new Set(CONFIG.EXCLUDE_CODES.map(s => s.toUpperCase()));
+  const rowDept = [], rowCab = [], rowChan = [], rowOutlet = [];
+  const outletIndex = new Map(), outletKeys = [];
+  const cRow = [], cDate = [], cVal = [];
+  const stats = {rows:0, skippedTotal:0, excludedRows:0, invalidCells:0, negativeCells:0};
+
+  for (let i = 2; i < lines.length; i++){
+    const line = lines[i]; if (!line.trim()) continue;
+    const f = splitLine(line, delim);
+    const dept = (f[idx.dept]||'').trim(), cab = (f[idx.cab]||'').trim(),
+          chan = (f[idx.chan]||'').trim(), kode = (f[idx.kode]||'').trim();
+    if (/^grand total$/i.test(dept) || /^total$/i.test(kode) || !kode){ stats.skippedTotal++; continue; }
+    if (exclude.has(kode.toUpperCase()) || exclude.has(chan.toUpperCase())){ stats.excludedRows++; continue; }
+    const r = rowDept.length;
+    rowDept.push(dept); rowCab.push(cab); rowChan.push(chan);
+    const ok = cab + '|' + kode;
+    let o = outletIndex.get(ok);
+    if (o === undefined){ o = outletKeys.length; outletIndex.set(ok, o); outletKeys.push(ok); }
+    rowOutlet.push(o);
+    for (let di = 0; di < dateCols.length; di++){
+      const raw = f[dateCols[di].col];
+      if (raw === undefined || raw === '') continue;
+      const v = parseNumber(raw);
+      if (v === null) continue;
+      if (isNaN(v)){ stats.invalidCells++; continue; }
+      if (v === 0) continue;
+      if (v < 0) stats.negativeCells++;
+      cRow.push(r); cDate.push(di); cVal.push(v);
+    }
+    stats.rows++;
+  }
+
+  const dates = dateCols.map(({col, ...rest}) => rest);
+  const hasData = new Uint8Array(dates.length);
+  for (let i = 0; i < cDate.length; i++) hasData[cDate[i]] = 1;
+
+  return {
+    dates, hasData,
+    rowDept, rowCab, rowChan, rowOutlet,
+    nOutlets: outletKeys.length,
+    cellRow: Int32Array.from(cRow), cellDate: Int32Array.from(cDate), cellVal: Float64Array.from(cVal),
+    stats
+  };
+}
+
+/** Kalender kerja: hari kerja per bulan, tanggal libur terdeteksi, Time Gone bulan berjalan. */
+function buildCalendar(model){
+  const {dates, hasData} = model;
+  let last = -1;
+  for (let i = dates.length-1; i >= 0; i--) if (hasData[i]){ last = i; break; }
+  if (last < 0) throw new Error('Data tidak berisi transaksi apa pun.');
+  const lastDate = dates[last];
+
+  const months = [];          // monthKey berurutan sampai bulan data terakhir
+  const monthOfDate = new Int32Array(dates.length).fill(-1);
+  const work = {};            // mk -> [dateIdx hari kerja]
+  const allIdx = {};          // mk -> [dateIdx semua tanggal <= last]
+  for (let i = 0; i <= last; i++){
+    const mk = dates[i].mk;
+    if (!work[mk]){ work[mk] = []; allIdx[mk] = []; months.push(mk); }
+    monthOfDate[i] = months.length - 1;
+    allIdx[mk].push(i);
+    if (CONFIG.WORK_DOW.includes(dates[i].dow) && hasData[i]) work[mk].push(i);
+  }
+
+  // libur terdeteksi: Senin–Sabtu tanpa transaksi / tanpa kolom, dari awal data s.d. tanggal terakhir
+  const present = new Set(); for (let i = 0; i <= last; i++) if (hasData[i]) present.add(dates[i].iso);
+  const detectedHolidays = [];
+  const d0 = dates[0];
+  let cur = new Date(Date.UTC(d0.y, d0.m-1, 1));
+  const end = new Date(Date.UTC(lastDate.y, lastDate.m-1, lastDate.d));
+  while (cur <= end){
+    const iso = isoOf(cur.getUTCFullYear(), cur.getUTCMonth()+1, cur.getUTCDate());
+    if (CONFIG.WORK_DOW.includes(cur.getUTCDay()) && !present.has(iso)) detectedHolidays.push(iso);
+    cur.setUTCDate(cur.getUTCDate()+1);
+  }
+  const sundayData = [];
+  for (let i = 0; i <= last; i++) if (hasData[i] && !CONFIG.WORK_DOW.includes(dates[i].dow)) sundayData.push(dates[i].iso);
+
+  // sisa hari kerja bulan berjalan (kalender + libur nasional)
+  const hol = new Set(CONFIG.HOLIDAYS);
+  const curMk = lastDate.mk;
+  const elapsed = work[curMk].length;
+  let remaining = 0;
+  const monthEnd = new Date(Date.UTC(lastDate.y, lastDate.m, 0)).getUTCDate();
+  for (let d = lastDate.d + 1; d <= monthEnd; d++){
+    const dow = new Date(Date.UTC(lastDate.y, lastDate.m-1, d)).getUTCDay();
+    if (CONFIG.WORK_DOW.includes(dow) && !hol.has(isoOf(lastDate.y, lastDate.m, d))) remaining++;
+  }
+  const totalCur = elapsed + remaining;
+  const tg = totalCur ? elapsed / totalCur : 1;
+
+  return {last, lastDate, months, monthOfDate, work, allIdx, detectedHolidays, sundayData,
+          current:{mk:curMk, elapsed, remaining, total:totalCur, tg, complete: remaining === 0}};
+}
+
+/** Tanggal batas (inklusif) per bulan untuk mode Full Month / Time Gone. */
+function monthCutoffs(cal, mode){
+  const res = {};
+  for (const mk of cal.months){
+    const all = cal.allIdx[mk], wk = cal.work[mk];
+    const W = wk.length;
+    if (mode !== 'tg' || W === 0){
+      res[mk] = {cutoff: all[all.length-1], k: W, W};
+      continue;
+    }
+    let k = (mk === cal.current.mk) ? cal.current.elapsed : Math.round(cal.current.tg * W);
+    k = Math.max(1, Math.min(W, k));
+    res[mk] = {cutoff: wk[k-1], k, W};
+  }
+  return res;
+}
+
+/**
+ * Hitung semua angka untuk kombinasi filter.
+ * opts: {depts:Set, chans:Set, mode:'full'|'tg', afterMonths:[mk]}
+ *  - Sales  : net (termasuk retur)
+ *  - AO     : outlet (cabang+KODELANG) unik dengan >=1 transaksi > 0, distinct lintas departemen/channel terpilih
+ *  - Avg    : rata-rata per bulan dalam periode (Cara A)
+ *  - Jumlah : Sales = SUM periode; AO = outlet unik selama periode (Cara B)
+ */
+function compute(model, cal, opts){
+  const {rowDept, rowCab, rowChan, rowOutlet, cellRow, cellDate, cellVal, nOutlets} = model;
+  const months = cal.months, nM = months.length;
+  const cut = monthCutoffs(cal, opts.mode);
+
+  const included = new Uint8Array(model.dates.length);
+  for (const mk of months){ for (const i of cal.allIdx[mk]) if (i <= cut[mk].cutoff) included[i] = 1; }
+
+  const cabs = [...new Set(rowCab)].sort();
+  const cabIdx = new Map(cabs.map((c,i) => [c,i]));
+  const rowSel = new Uint8Array(rowDept.length), rowC = new Int32Array(rowDept.length);
+  for (let r = 0; r < rowDept.length; r++){
+    rowSel[r] = (opts.depts.has(rowDept[r]) && opts.chans.has(rowChan[r])) ? 1 : 0;
+    rowC[r] = cabIdx.get(rowCab[r]);
+  }
+
+  const mIdx = new Map(months.map((m,i) => [m,i]));
+  const bef = CONFIG.BEFORE_MONTHS.filter(m => mIdx.has(m)).map(m => mIdx.get(m));
+  const aft = opts.afterMonths.filter(m => mIdx.has(m)).map(m => mIdx.get(m));
+  const inBef = new Uint8Array(nM), inAft = new Uint8Array(nM);
+  bef.forEach(i => inBef[i] = 1); aft.forEach(i => inAft[i] = 1);
+
+  const nC = cabs.length;
+  const sales = new Float64Array(nC * nM), ao = new Float64Array(nC * nM);
+  const uniqB = new Float64Array(nC), uniqA = new Float64Array(nC), uniqAll = new Float64Array(nC);
+  const seenM = new Uint8Array(nOutlets * nM), seenB = new Uint8Array(nOutlets), seenA = new Uint8Array(nOutlets), seenAll = new Uint8Array(nOutlets);
+  const hasRow = new Uint8Array(nC);
+  for (let r = 0; r < rowSel.length; r++) if (rowSel[r]) hasRow[rowC[r]] = 1;
+
+  for (let i = 0, n = cellRow.length; i < n; i++){
+    const r = cellRow[i];
+    if (!rowSel[r]) continue;
+    const d = cellDate[i];
+    if (!included[d]) continue;
+    const m = cal.monthOfDate[d]; if (m < 0) continue;
+    const c = rowC[r], v = cellVal[i];
+    sales[c*nM + m] += v;
+    if (v > 0){
+      const o = rowOutlet[r], k = o*nM + m;
+      if (!seenM[k]){ seenM[k] = 1; ao[c*nM + m]++; }
+      if (inBef[m] && !seenB[o]){ seenB[o] = 1; uniqB[c]++; }
+      if (inAft[m] && !seenA[o]){ seenA[o] = 1; uniqA[c]++; }
+      if ((inBef[m] || inAft[m]) && !seenAll[o]){ seenAll[o] = 1; uniqAll[c]++; }
+    }
+  }
+
+  const sumIdx = (arr, base, idxs) => idxs.reduce((s,i) => s + arr[base + i], 0);
+  const growth = (b, a) => (b > 0 ? (a - b) / b * 100 : null);
+
+  function build(salesM, aoM, uB, uA, uAll){
+    const sBefSum = bef.reduce((s,i) => s + salesM[i], 0), sAftSum = aft.reduce((s,i) => s + salesM[i], 0);
+    const sBef = bef.length ? sBefSum / bef.length : 0, sAft = aft.length ? sAftSum / aft.length : 0;
+    const aBef = bef.length ? bef.reduce((s,i) => s + aoM[i], 0) / bef.length : 0;
+    const aAft = aft.length ? aft.reduce((s,i) => s + aoM[i], 0) / aft.length : 0;
+    return {
+      sales:{months:salesM, bef:sBef, aft:sAft, gap:sAft - sBef, growth:growth(sBef, sAft), befSum:sBefSum, aftSum:sAftSum, allSum:sBefSum + sAftSum},
+      ao:{months:aoM, bef:aBef, aft:aAft, gap:aAft - aBef, growth:growth(aBef, aAft), befUniq:uB, aftUniq:uA, allUniq:uAll}
+    };
+  }
+
+  const rows = [];
+  const totS = new Array(nM).fill(0), totA = new Array(nM).fill(0);
+  let tUB = 0, tUA = 0, tUAll = 0;
+  for (let c = 0; c < nC; c++){
+    const sM = Array.from(sales.subarray(c*nM, c*nM + nM)), aM = Array.from(ao.subarray(c*nM, c*nM + nM));
+    for (let m = 0; m < nM; m++){ totS[m] += sM[m]; totA[m] += aM[m]; }
+    tUB += uniqB[c]; tUA += uniqA[c]; tUAll += uniqAll[c];
+    if (!hasRow[c]) continue;
+    rows.push({cab: cabs[c], ...build(sM, aM, uniqB[c], uniqA[c], uniqAll[c])});
+  }
+  const total = {cab:'Grand Total', ...build(totS, totA, tUB, tUA, tUAll)};
+  return {rows, total, months, cut, befIdx:bef, aftIdx:aft};
+}
+/*ENGINE-END*/
+
+/* ==================================================================
+   FORMAT & VIEW (fungsi murni menghasilkan HTML/SVG)
+   ================================================================== */
+const nfInt = new Intl.NumberFormat('id-ID', {maximumFractionDigits:0});
+const nf1 = new Intl.NumberFormat('id-ID', {minimumFractionDigits:1, maximumFractionDigits:1});
+const nf2 = new Intl.NumberFormat('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2});
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const mkLabel = mk => MONTH_ID[Number(mk.slice(5)) - 1];
+const mkLabelY = mk => mkLabel(mk) + ' ' + mk.slice(0,4);
+const dateLabel = d => d.d + ' ' + MONTH_ID[d.m-1] + ' ' + d.y;
+
+function fmtRp(v, signed){
+  if (v === null || v === undefined || isNaN(v)) return '–';
+  const s = signed ? (v > 0 ? '+' : v < 0 ? '−' : '') : (v < 0 ? '−' : '');
+  const a = Math.abs(v);
+  if (a >= 1e12) return s + nf2.format(a/1e12) + ' T';
+  if (a >= 1e9)  return s + nf2.format(a/1e9) + ' M';
+  if (a >= 1e6)  return s + nf1.format(a/1e6) + ' jt';
+  return s + nfInt.format(a);
+}
+function fmtAO(v, signed){
+  if (v === null || v === undefined || isNaN(v)) return '–';
+  const s = signed ? (v > 0 ? '+' : v < 0 ? '−' : '') : '';
+  const a = Math.abs(v);
+  return s + (Number.isInteger(Math.round(a*10)/10) && Math.round(a*10) % 10 === 0 ? nfInt.format(Math.round(a)) : nf1.format(a));
+}
+function fmtPct(v){
+  if (v === null || v === undefined || isNaN(v)) return '–';
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + nf1.format(Math.abs(v)) + '%';
+}
+const cls = v => (v === null || v === undefined || isNaN(v) || Math.abs(v) < 0.05) ? 'muted' : (v > 0 ? 'pos' : 'neg');
+
+function viewBanner(res, ctx){
+  const t = res.total;
+  const befLbl = 'Before', aftLbl = 'After';
+  const card = (title, m, fmt, unitNote, jumlahNote) => `
+    <div class="kpi">
+      <div class="kpi-head">
+        <div>
+          <div class="kpi-title">${title}</div>
+          <div class="kpi-growth num ${cls(m.growth)}">${fmtPct(m.growth)}</div>
+          <div class="kpi-gap num">Gap rata-rata/bulan: <b class="${cls(m.gap)}">${fmt(m.gap, true)}</b>${unitNote}</div>
+        </div>
+      </div>
+      <div class="kpi-grid num">
+        <span class="h"></span><span class="h" style="text-align:right">${befLbl} · ${ctx.befRange}</span><span class="h" style="text-align:right">${aftLbl} · ${ctx.aftRange}</span>
+        <span class="r">Rata-rata / bulan</span><span class="v">${fmt(m.bef)}</span><span class="v">${fmt(m.aft)}</span>
+        <span class="r">Jumlah periode</span><span class="v">${fmt(m.befJ)}</span><span class="v">${fmt(m.aftJ)}</span>
+      </div>
+      <div class="kpi-note">${jumlahNote}</div>
+    </div>`;
+  const s = {...t.sales, befJ:t.sales.befSum, aftJ:t.sales.aftSum};
+  const a = {...t.ao, befJ:t.ao.befUniq, aftJ:t.ao.aftUniq};
+  return card('Sales', s, fmtRp, '',
+      `Growth dihitung dari rata-rata per bulan. Jumlah = total sales periode (${ctx.befN} vs ${ctx.aftN} bulan, tidak untuk dibandingkan langsung).`) +
+    card('Active Outlet (AO)', a, fmtAO, ' outlet',
+      `Jumlah = outlet unik yang bertransaksi minimal 1x selama periode. Total ${ctx.befRange.split('–')[0]}–${ctx.aftRange.split('–').pop()}: <b>${nfInt.format(t.ao.allUniq)}</b> outlet unik.`);
+}
+
+function pickTopBottom(rows, metric){
+  const list = rows.filter(r => r[metric].growth !== null)
+                   .sort((p,q) => p[metric].growth - q[metric].growth);
+  if (list.length <= 6){
+    const half = Math.floor(list.length/2);
+    return list.map((r,i) => ({r, grp: i < half ? 'bot' : 'top'}));
+  }
+  return [...list.slice(0,3).map(r => ({r, grp:'bot'})), ...list.slice(-3).map(r => ({r, grp:'top'}))];
+}
+
+function viewTopBottomChart(items, metric){
+  if (!items.length) return '<div class="muted" style="padding:30px;text-align:center">Tidak ada data untuk filter ini.</div>';
+  const W = 760, H = 330, padT = 46, padB = 58, padL = 14, padR = 14;
+  const vals = items.map(x => x.r[metric].growth);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  const span = (hi - lo) || 1; hi += span*0.22; lo -= (lo < 0 ? span*0.22 : 0);
+  const plotH = H - padT - padB;
+  const y = v => padT + (hi - v) / (hi - lo) * plotH;
+  const n = items.length, slot = (W - padL - padR) / n, bw = Math.min(64, slot*0.55);
+  const fmtGap = metric === 'sales' ? fmtRp : fmtAO;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Bottom 3 dan Top 3 cabang" style="display:block;max-height:380px">`;
+  // gridlines
+  const step = niceStep((hi - lo) / 5);
+  for (let g = Math.ceil(lo/step)*step; g <= hi; g += step){
+    const yy = y(g);
+    s += `<line x1="${padL}" x2="${W-padR}" y1="${yy}" y2="${yy}" stroke="${Math.abs(g)<1e-9?'#9aa8a3':'#edf1ef'}" stroke-width="${Math.abs(g)<1e-9?1.2:1}"/>`;
+    s += `<text x="${padL+2}" y="${yy-3}" font-size="10" fill="#9aa8a3">${nf1.format(g).replace(',0','')}%</text>`;
+  }
+  // divider between groups
+  const nb = items.filter(x => x.grp === 'bot').length;
+  if (nb > 0 && nb < n){
+    const xd = padL + slot*nb;
+    s += `<line x1="${xd}" x2="${xd}" y1="${padT-30}" y2="${H-padB+40}" stroke="#cfd8d4" stroke-dasharray="4 4"/>`;
+  }
+  s += `<text x="${padL + slot*nb/2}" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="#c23a3a" letter-spacing=".06em">BOTTOM ${nb}</text>`;
+  s += `<text x="${padL + slot*nb + slot*(n-nb)/2}" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="#13805b" letter-spacing=".06em">TOP ${n-nb}</text>`;
+  items.forEach((it, i) => {
+    const v = it.r[metric].growth, cx = padL + slot*i + slot/2;
+    const y0 = y(0), y1 = y(v), top = Math.min(y0,y1), h = Math.max(2, Math.abs(y1-y0));
+    const col = it.grp === 'bot' ? '#c23a3a' : '#13805b';
+    s += `<rect x="${cx-bw/2}" y="${top}" width="${bw}" height="${h}" rx="4" fill="${col}" opacity=".9"><title>${esc(it.r.cab)}: ${fmtPct(v)} · Gap ${fmtGap(it.r[metric].gap, true)}</title></rect>`;
+    const ly = v >= 0 ? top - 20 : top + h + 15;
+    s += `<text x="${cx}" y="${ly}" text-anchor="middle" font-size="13" font-weight="700" fill="${col}">${fmtPct(v)}</text>`;
+    s += `<text x="${cx}" y="${ly+14}" text-anchor="middle" font-size="11" fill="#4a5853">${fmtGap(it.r[metric].gap, true)}</text>`;
+    s += `<text x="${cx}" y="${H-padB+38}" text-anchor="middle" font-size="13" font-weight="700" fill="#17211d">${esc(it.r.cab)}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function niceStep(raw){
+  const p = Math.pow(10, Math.floor(Math.log10(raw || 1))), f = raw / p;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+function viewRankTable(res, metric, tb){
+  const rows = [...res.rows].sort((p,q) => {
+    const a = p[metric].growth, b = q[metric].growth;
+    if (a === null) return 1; if (b === null) return -1; return b - a;
+  });
+  const topSet = new Set(tb.filter(x => x.grp === 'top').map(x => x.r.cab));
+  const botSet = new Set(tb.filter(x => x.grp === 'bot').map(x => x.r.cab));
+  const g = v => `<span class="chip ${cls(v)}">${fmtPct(v)}</span>`;
+  const line = (r, rank, klass) => `
+    <tr class="${klass}">
+      <td class="rk">${rank}</td><td><b>${esc(r.cab)}</b></td>
+      <td class="n sep num">${fmtAO(r.ao.bef)}</td><td class="n num">${fmtAO(r.ao.aft)}</td>
+      <td class="n num ${cls(r.ao.gap)}">${fmtAO(r.ao.gap, true)}</td><td class="n num">${g(r.ao.growth)}</td>
+      <td class="n sep num">${fmtRp(r.sales.bef)}</td><td class="n num">${fmtRp(r.sales.aft)}</td>
+      <td class="n num ${cls(r.sales.gap)}">${fmtRp(r.sales.gap, true)}</td><td class="n num">${g(r.sales.growth)}</td>
+    </tr>`;
+  let h = `<table><thead>
+    <tr class="grp"><th></th><th></th><th class="n sep" colspan="4" style="text-align:center">Active Outlet (rata-rata/bulan)</th><th class="n sep" colspan="4" style="text-align:center">Sales (rata-rata/bulan)</th></tr>
+    <tr><th>Rank</th><th>Cabang</th>
+      <th class="n sep">Before</th><th class="n">After</th><th class="n">Gap</th><th class="n">Growth${metric==='ao'?' ▾':''}</th>
+      <th class="n sep">Before</th><th class="n">After</th><th class="n">Gap</th><th class="n">Growth${metric==='sales'?' ▾':''}</th></tr>
+    </thead><tbody>`;
+  rows.forEach((r,i) => { h += line(r, i+1, topSet.has(r.cab) ? 'top' : botSet.has(r.cab) ? 'bot' : ''); });
+  h += line(res.total, '', 'total').replace('<td class="rk"></td>', '<td class="rk">Σ</td>');
+  return h + '</tbody></table>';
+}
+
+function periodOf(res, mi){
+  if (res.befIdx.includes(mi)) return 'before';
+  if (res.aftIdx.includes(mi)) return 'after';
+  return 'other';
+}
+
+function viewLineChart(series, res, cal, fmt, color){
+  const months = res.months, n = months.length;
+  const W = 760, H = 270, padT = 52, padB = 34, padL = 16, padR = 16;
+  const vals = series.filter(v => v !== null);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = (hi - lo) || Math.abs(hi) || 1;
+  lo = lo - span*0.35; hi = hi + span*0.35;
+  if (Math.min(...vals) >= 0 && lo < 0) lo = 0;
+  const slot = (W - padL - padR) / n;
+  const x = i => padL + slot*i + slot/2;
+  const y = v => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" style="display:block;max-height:300px">`;
+  months.forEach((mk, i) => {
+    const p = periodOf(res, i), isCur = mk === cal.current.mk && !cal.current.complete;
+    const fill = isCur ? '#fff6e5' : p === 'after' ? '#eaf4ef' : null;
+    if (fill) s += `<rect x="${padL + slot*i}" y="${padT-24}" width="${slot}" height="${H-padT-padB+24}" fill="${fill}"/>`;
+  });
+  // average lines
+  const avgOf = idxs => idxs.length ? idxs.reduce((a,i) => a + series[i], 0) / idxs.length : null;
+  [[res.befIdx, 'Avg Before'], [res.aftIdx, 'Avg After']].forEach(([idxs, lbl]) => {
+    const av = avgOf(idxs); if (av === null) return;
+    const x1 = padL + slot*Math.min(...idxs), x2 = padL + slot*(Math.max(...idxs)+1), yy = y(av);
+    s += `<line x1="${x1+4}" x2="${x2-4}" y1="${yy}" y2="${yy}" stroke="#7b8984" stroke-dasharray="5 4" stroke-width="1.2"/>`;
+    // label rata-rata di bagian paling atas, di tengah rentang periodenya
+    s += `<line x1="${x1+10}" x2="${x2-10}" y1="${14}" y2="${14}" stroke="#7b8984" stroke-dasharray="5 4" stroke-width="1.2"/>`;
+    s += `<text x="${(x1+x2)/2}" y="${18}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#4a5853" paint-order="stroke" stroke="#fff" stroke-width="6">${lbl}: ${fmt(av)}</text>`;
+  });
+  let path = '';
+  series.forEach((v,i) => { if (v === null) return; path += (path ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
+  s += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  series.forEach((v,i) => {
+    if (v === null) return;
+    s += `<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="#fff" stroke="${color}" stroke-width="2.2"><title>${mkLabelY(months[i])}: ${fmt(v)}</title></circle>`;
+    s += `<text x="${x(i)}" y="${y(v)-10}" text-anchor="middle" font-size="11" font-weight="600" fill="#17211d">${fmt(v)}</text>`;
+    s += `<text x="${x(i)}" y="${H-12}" text-anchor="middle" font-size="12" fill="#4a5853">${mkLabel(months[i])}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function viewMatrix(r, res, cal, mode){
+  const months = res.months;
+  const headCls = i => {
+    const mk = months[i];
+    if (mk === cal.current.mk && !cal.current.complete) return 'current';
+    return periodOf(res, i) === 'after' ? 'after' : '';
+  };
+  const lastBef = Math.max(...res.befIdx), firstAft = Math.min(...res.aftIdx);
+  const sepCls = i => (i === firstAft || i === lastBef + 1) ? ' sep' : '';
+  let h = `<table class="num"><thead>
+    <tr class="period-row"><th></th>${months.map((mk,i) => `<th class="n ${headCls(i)}${sepCls(i)}">${periodOf(res,i)==='before'?'Before':periodOf(res,i)==='after'?'After':'Berjalan'}</th>`).join('')}
+      <th class="n sep">Avg Before</th><th class="n">Avg After</th><th class="n">Gap</th><th class="n">Growth</th></tr>
+    <tr><th>Metrik</th>${months.map((mk,i) => `<th class="n ${headCls(i)}${sepCls(i)}">${mkLabel(mk)}</th>`).join('')}
+      <th class="n sep"></th><th class="n"></th><th class="n"></th><th class="n"></th></tr></thead><tbody>`;
+  const row = (lbl, arr, m, fmt) => `<tr><td><b>${lbl}</b></td>${arr.map((v,i) => `<td class="n ${headCls(i)}${sepCls(i)}">${fmt(v)}</td>`).join('')}
+      <td class="n sep">${fmt(m.bef)}</td><td class="n">${fmt(m.aft)}</td><td class="n ${cls(m.gap)}">${fmt(m.gap,true)}</td><td class="n ${cls(m.growth)}"><b>${fmtPct(m.growth)}</b></td></tr>`;
+  h += row('Sales', r.sales.months, r.sales, fmtRp);
+  h += row('Active Outlet', r.ao.months, r.ao, fmtAO);
+  const days = months.map(mk => res.cut[mk]);
+  h += `<tr><td class="muted">Hari kerja${mode==='tg'?' (dipakai / total)':''}</td>${days.map((c,i) =>
+      `<td class="n muted ${headCls(i)}${sepCls(i)}">${mode==='tg' ? c.k + '/' + c.W : c.W + (months[i]===cal.current.mk && !cal.current.complete ? '/' + cal.current.total : '')}</td>`).join('')}
+      <td class="sep"></td><td></td><td></td><td></td></tr>`;
+  return h + '</tbody></table>';
+}
+
+function buildExportCSV(res, metric, ctx){
+  const rows = [...res.rows].sort((p,q) => {
+    const a = p[metric].growth, b = q[metric].growth;
+    if (a === null) return 1; if (b === null) return -1; return b - a;
+  });
+  const n = (v, d) => (v === null || isNaN(v)) ? '' : v.toFixed(d).replace('.', ',');
+  const lines = [];
+  lines.push(['Filter', `Dept: ${ctx.deptText} | Channel: ${ctx.chanText} | Mode: ${ctx.modeText} | Before: ${ctx.befRange} | After: ${ctx.aftRange} | Data per: ${ctx.dataPer}`].join(';'));
+  lines.push(['Rank','Cabang','Avg AO Before','Avg AO After','AO Gap','AO Growth %','Jumlah AO Unik Before','Jumlah AO Unik After',
+              'Avg Sales Before','Avg Sales After','Sales Gap','Sales Growth %','Jumlah Sales Before','Jumlah Sales After'].join(';'));
+  const out = (r, rank) => [rank, r.cab, n(r.ao.bef,1), n(r.ao.aft,1), n(r.ao.gap,1), n(r.ao.growth,2), r.ao.befUniq, r.ao.aftUniq,
+      n(r.sales.bef,0), n(r.sales.aft,0), n(r.sales.gap,0), n(r.sales.growth,2), n(r.sales.befSum,0), n(r.sales.aftSum,0)].join(';');
+  rows.forEach((r,i) => lines.push(out(r, i+1)));
+  lines.push(out(res.total, ''));
+  return '﻿' + lines.join('\r\n');
+}
+
+/* ==================================================================
+   APLIKASI (state, event, render)
+   ================================================================== */
+const state = {model:null, cal:null, depts:null, chans:null, allDepts:[], allChans:[],
+               mode:'full', afterKey:'base', metric:'sales', tab:'ringkasan', cab:'__total', res:null};
+const $ = id => document.getElementById(id);
+
+function rangeText(mks){ if (!mks.length) return '–'; return mks.length === 1 ? mkLabel(mks[0]) : mkLabel(mks[0]) + '–' + mkLabel(mks[mks.length-1]); }
+
+function afterMonthsFor(key){
+  const cal = state.cal;
+  if (key === 'base') return CONFIG.AFTER_MONTHS.slice();
+  const startI = cal.months.indexOf(CONFIG.AFTER_MONTHS[0]);
+  return startI < 0 ? CONFIG.AFTER_MONTHS.slice() : cal.months.slice(startI);
+}
+
+function context(){
+  const cal = state.cal, aft = afterMonthsFor(state.afterKey).filter(m => cal.months.includes(m));
+  const bef = CONFIG.BEFORE_MONTHS.filter(m => cal.months.includes(m));
+  const sel = (set, all, word) => set.size === all.length ? 'Semua ' + word : [...set].join(', ');
+  return {
+    befRange: rangeText(bef), aftRange: rangeText(aft), befN: bef.length, aftN: aft.length,
+    deptText: sel(state.depts, state.allDepts, 'departemen'), chanText: sel(state.chans, state.allChans, 'channel'),
+    modeText: state.mode === 'tg' ? `Time Gone ${nf1.format(cal.current.tg*100)}%` : 'Full Month',
+    dataPer: dateLabel(cal.lastDate)
+  };
+}
+
+function render(){
+  const {model, cal} = state;
+  const ctx = context();
+  const res = compute(model, cal, {depts:state.depts, chans:state.chans, mode:state.mode, afterMonths:afterMonthsFor(state.afterKey)});
+  state.res = res;
+
+  const c = cal.current, curLbl = mkLabelY(c.mk);
+  let ctxHtml = `<span>Departemen: <b>${esc(ctx.deptText)}</b></span><span>Channel: <b>${esc(ctx.chanText)}</b></span>`;
+  if (state.mode === 'tg'){
+    ctxHtml += `<span>Time Gone ${esc(curLbl)}: <b>${nf1.format(c.tg*100)}%</b> (${c.elapsed} dari ${c.total} hari kerja) — setiap bulan dipotong di porsi hari kerja yang sama</span>`;
+  } else if (!c.complete){
+    ctxHtml += `<span><span class="pill">MTD</span> ${esc(curLbl)} baru ${c.elapsed} dari ${c.total} hari kerja</span>`;
+  }
+  $('context').innerHTML = ctxHtml;
+  $('banner').innerHTML = viewBanner(res, ctx);
+
+  if (state.tab === 'ringkasan'){
+    const tb = pickTopBottom(res.rows, state.metric);
+    $('chartTitle').textContent = `Bottom 3 & Top 3 Cabang — ${state.metric === 'sales' ? 'Sales Growth' : 'AO Growth'}`;
+    $('chartTopBottom').innerHTML = viewTopBottomChart(tb, state.metric);
+    $('rankTable').innerHTML = viewRankTable(res, state.metric, tb);
+    $('rankDesc').textContent = `Rata-rata per bulan, Before ${ctx.befRange} vs After ${ctx.aftRange}. Diurutkan berdasarkan ${state.metric === 'sales' ? 'Sales' : 'AO'} Growth. Grand Total di baris paling bawah.`;
+  } else {
+    const r = state.cab === '__total' ? res.total : (res.rows.find(x => x.cab === state.cab) || res.total);
+    $('chartSales').innerHTML = viewLineChart(r.sales.months, res, cal, fmtRp, '#0f6b4f');
+    $('chartAO').innerHTML = viewLineChart(r.ao.months, res, cal, v => fmtAO(v), '#2f5fa8');
+    $('trendSalesDesc').textContent = `${r.cab === 'Grand Total' ? 'Grand Total (semua cabang)' : 'Cabang ' + r.cab} · sales net (termasuk retur)` +
+      (state.mode === 'tg' ? ` · dipotong di Time Gone ${nf1.format(c.tg*100)}%` : '');
+    $('matrix').innerHTML = viewMatrix(r, res, cal, state.mode);
+    $('matrixDesc').textContent = state.mode === 'tg'
+      ? 'Mode Time Gone: baris hari kerja menunjukkan berapa hari kerja yang dihitung di setiap bulan.'
+      : 'Garis pemisah menandai pergantian periode Before → After.';
+  }
+}
+
+/* ---------- multi-select dropdown ---------- */
+function makeMulti(el, opts, getSet, setSet, word, searchable){
+  const all = opts;
+  el.innerHTML = `<button class="dd-btn" type="button" aria-haspopup="true"><span></span><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    <div class="dd-menu">${searchable ? '<input class="dd-search" placeholder="Cari…">' : ''}<div class="dd-list"></div></div>`;
+  const btn = el.querySelector('.dd-btn'), list = el.querySelector('.dd-list'), search = el.querySelector('.dd-search');
+  function label(){
+    const s = getSet();
+    btn.querySelector('span').textContent = s.size === all.length ? 'Semua ' + word : (s.size <= 2 ? [...s].join(', ') : s.size + ' ' + word + ' dipilih');
+  }
+  function draw(){
+    const s = getSet(), q = search ? search.value.trim().toLowerCase() : '';
+    const allOn = s.size === all.length;
+    let h = `<label class="dd-item all"><input type="checkbox" data-all="1" ${allOn ? 'checked' : ''}>Semua ${esc(word)}</label>`;
+    all.filter(o => !q || o.toLowerCase().includes(q)).forEach(o => {
+      h += `<label class="dd-item"><input type="checkbox" data-v="${esc(o)}" ${(!allOn && s.has(o)) ? 'checked' : ''}>${esc(o)}</label>`;
+    });
+    list.innerHTML = h;
+  }
+  list.addEventListener('change', e => {
+    const cb = e.target; let s;
+    if (cb.dataset.all){ s = new Set(all); }
+    else {
+      const cur = getSet();
+      s = cur.size === all.length ? new Set() : new Set(cur);
+      if (cb.checked) s.add(cb.dataset.v); else s.delete(cb.dataset.v);
+      if (s.size === 0) s = new Set(all);
+    }
+    setSet(s); draw(); label(); render();
+  });
+  if (search) search.addEventListener('input', draw);
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.dd.open').forEach(d => { if (d !== el) d.classList.remove('open'); });
+    el.classList.toggle('open'); if (el.classList.contains('open')){ draw(); if (search) search.focus(); }
+  });
+  el.querySelector('.dd-menu').addEventListener('click', e => e.stopPropagation());
+  label();
+}
+if (typeof document !== 'undefined')
+  document.addEventListener('click', () => document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')));
+
+function setupSeg(id, key){
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state[key] = b.dataset.v;
+    $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    render();
+  });
+}
+
+function initApp(model){
+  const cal = buildCalendar(model);
+  state.model = model; state.cal = cal;
+  const deptOrder = ['DIST','SUBDIST','TRAD'];
+  state.allDepts = [...new Set(model.rowDept)].sort((a,b) => {
+    const ia = deptOrder.indexOf(a), ib = deptOrder.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+  });
+  state.allChans = [...new Set(model.rowChan)].sort((a,b) => a.localeCompare(b, 'id'));
+  state.depts = new Set(state.allDepts); state.chans = new Set(state.allChans);
+
+  makeMulti($('ddDept'), state.allDepts, () => state.depts, s => state.depts = s, 'departemen', false);
+  makeMulti($('ddChan'), state.allChans, () => state.chans, s => state.chans = s, 'channel', true);
+
+  // periode After
+  const cur = cal.current.mk, lastAfter = CONFIG.AFTER_MONTHS[CONFIG.AFTER_MONTHS.length-1];
+  let opt = `<option value="base">${rangeText(CONFIG.AFTER_MONTHS)} ${CONFIG.AFTER_MONTHS[0].slice(0,4)} (periode Booster)</option>`;
+  if (cur > lastAfter) opt += `<option value="ext">${mkLabel(CONFIG.AFTER_MONTHS[0])}–${mkLabel(cur)} (s.d. bulan berjalan)</option>`;
+  $('selAfter').innerHTML = opt;
+  $('selAfter').value = state.afterKey;
+
+  $('btnModeTG').textContent = `Time Gone ${nf1.format(cal.current.tg*100)}%`;
+  $('selCab').innerHTML = `<option value="__total">Grand Total</option>` +
+    [...new Set(model.rowCab)].sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+  const st = $('stamp');
+  st.innerHTML = `Data per <b>${dateLabel(cal.lastDate)}</b>`;
+  st.classList.remove('hidden');
+  $('btnExport').classList.remove('hidden');
+
+  const hol = cal.detectedHolidays.map(iso => { const [y,m,d] = iso.split('-').map(Number); return `${d} ${MONTH_ID[m-1]}`; });
+  $('footer').innerHTML = `
+    ${nfInt.format(model.stats.rows)} baris · ${nfInt.format(model.nOutlets)} outlet · ${state.allChans.length} channel · ${new Set(model.rowCab).size} cabang
+    ${model.stats.excludedRows ? ` · ${model.stats.excludedRows} baris ${CONFIG.EXCLUDE_CODES.join('/')} dikecualikan` : ''}
+    ${model.stats.invalidCells ? ` · <span class="err">${model.stats.invalidCells} sel tidak terbaca</span>` : ''}
+    <details><summary>Tanggal libur terdeteksi dari data (Senin–Sabtu tanpa transaksi)</summary>${hol.join(', ') || '–'}
+    ${cal.sundayData.length ? `<br>Transaksi di hari Minggu (sales dihitung, bukan hari kerja): ${cal.sundayData.map(iso => { const [y,m,d] = iso.split('-').map(Number); return d + ' ' + MONTH_ID[m-1]; }).join(', ')}` : ''}
+    </details>`;
+
+  $('loader').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  render();
+}
+
+function fail(msg){
+  $('loadStatus').innerHTML = `<div class="err">${esc(msg)}</div>`;
+  $('dropZone').classList.remove('hidden');
+}
+
+function processText(text){
+  $('loader').classList.remove('hidden');
+  $('loadStatus').innerHTML = '<div class="spinner"></div><div>Memproses data…</div>';
+  setTimeout(() => {
+    try { initApp(parseTableauCSV(text)); }
+    catch (e){ $('app').classList.add('hidden'); fail('Gagal membaca file: ' + e.message); }
+  }, 30);
+}
+
+function loadFile(file){
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => processText(fr.result);
+  fr.onerror = () => fail('File tidak bisa dibaca.');
+  fr.readAsText(file, 'utf-8');
+}
+
+function boot(){
+  setupSeg('segMode', 'mode');
+  setupSeg('segMetric', 'metric');
+  $('selAfter').addEventListener('change', e => { state.afterKey = e.target.value; render(); });
+  $('selCab').addEventListener('change', e => { state.cab = e.target.value; render(); });
+  $('tabs').addEventListener('click', e => {
+    const b = e.target.closest('.tab'); if (!b) return;
+    state.tab = b.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t === b ? 'true' : 'false'));
+    $('tabRingkasan').classList.toggle('hidden', state.tab !== 'ringkasan');
+    $('tabTrend').classList.toggle('hidden', state.tab !== 'trend');
+    $('fMetric').classList.toggle('hidden', state.tab !== 'ringkasan');
+    $('fCab').classList.toggle('hidden', state.tab !== 'trend');
+    if (state.model) render();
+  });
+  $('btnLoadFile').addEventListener('click', () => $('fileInput').click());
+  $('btnPick').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', e => loadFile(e.target.files[0]));
+  const dz = $('dropZone');
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('hover'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('hover'); }));
+  dz.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+  $('btnExport').addEventListener('click', () => {
+    if (!state.res) return;
+    const csv = buildExportCSV(state.res, state.metric, context());
+    const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    const a = document.createElement('a');
+    a.href = url; a.download = `ao_booster_ringkasan_${state.cal.lastDate.iso}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  // Ambil CSV terbaru dari folder yang sama (tanpa cache)
+  fetch(CONFIG.CSV_URL + '?t=' + Date.now(), {cache:'no-store'})
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(processText)
+    .catch(() => fail('File data belum ditemukan otomatis (wajar bila halaman dibuka langsung dari komputer).'));
+}
+
+if (typeof document !== 'undefined' && document.getElementById('app')) boot();
+</script>
+</body>
+</html>
