@@ -63,6 +63,9 @@
   .seg button+button{border-left:1px solid var(--line-2)}
   .seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
   select.sel{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:8px 10px}
+  .range{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink-3)}
+  .range select.sel{padding:8px 6px}
+  .pill.warn{background:var(--neg-soft);color:var(--neg)}
   .context{font-size:12.5px;color:var(--ink-2);margin:0 2px 14px;display:flex;flex-wrap:wrap;gap:6px 16px}
   .context b{color:var(--ink)}
   .pill{display:inline-block;background:var(--current);color:var(--warn);border-radius:999px;padding:1px 8px;font-weight:600;font-size:11.5px}
@@ -142,7 +145,7 @@
   <div class="hdr wrap">
     <div>
       <h1>Dashboard AO Booster</h1>
-      <div class="sub">Pertumbuhan Sales &amp; Active Outlet per Cabang · Before (Jan–Jun) vs After (Jul–Sep)</div>
+      <div class="sub" id="hdrSub">Pertumbuhan Sales &amp; Active Outlet per Cabang</div>
     </div>
     <div class="hdr-right">
       <span class="stamp hidden" id="stamp"></span>
@@ -176,8 +179,8 @@
         <button data-v="tg" aria-pressed="false" id="btnModeTG">Time Gone</button>
       </div>
     </div>
-    <div class="f"><label for="selAfter">Periode After</label>
-      <select class="sel" id="selAfter"></select>
+    <div class="f"><label for="aftTo">Periode After</label>
+      <select class="sel" id="aftTo"></select>
     </div>
     <div class="f" id="fMetric"><span class="lbl">Peringkat Berdasarkan</span>
       <div class="seg" id="segMetric">
@@ -244,6 +247,8 @@ const CONFIG = {
   CSV_URL: 'data_ao_booster.csv',
   BEFORE_MONTHS: ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'],
   AFTER_MONTHS:  ['2026-07','2026-08','2026-09'],
+  // Mode Time Gone: tampilkan peringatan bila porsi bulan berjalan masih di bawah ini
+  TG_WARN: 0.20,
   // Kode outlet yang bukan outlet sungguhan: dikeluarkan dari seluruh perhitungan
   EXCLUDE_CODES: ['OTHERSB'],
   // Hari kerja: Senin–Sabtu (0 = Minggu)
@@ -462,7 +467,7 @@ function compute(model, cal, opts){
   }
 
   const mIdx = new Map(months.map((m,i) => [m,i]));
-  const bef = CONFIG.BEFORE_MONTHS.filter(m => mIdx.has(m)).map(m => mIdx.get(m));
+  const bef = (opts.beforeMonths || CONFIG.BEFORE_MONTHS).filter(m => mIdx.has(m)).map(m => mIdx.get(m));
   const aft = opts.afterMonths.filter(m => mIdx.has(m)).map(m => mIdx.get(m));
   const inBef = new Uint8Array(nM), inAft = new Uint8Array(nM);
   bef.forEach(i => inBef[i] = 1); aft.forEach(i => inAft[i] = 1);
@@ -576,7 +581,7 @@ function viewBanner(res, ctx){
   return card('Sales', s, fmtRp, '',
       `Growth dihitung dari rata-rata per bulan. Jumlah = total sales periode (${ctx.befN} vs ${ctx.aftN} bulan, tidak untuk dibandingkan langsung).`) +
     card('Active Outlet (AO)', a, fmtAO, ' outlet',
-      `Jumlah = outlet unik yang bertransaksi minimal 1x selama periode. Total ${ctx.befRange.split('–')[0]}–${ctx.aftRange.split('–').pop()}: <b>${nfInt.format(t.ao.allUniq)}</b> outlet unik.`);
+      `Jumlah = outlet unik yang bertransaksi minimal 1x selama periode. Gabungan kedua periode: <b>${nfInt.format(t.ao.allUniq)}</b> outlet unik.`);
 }
 
 function pickTopBottom(rows, metric){
@@ -751,24 +756,51 @@ function buildExportCSV(res, metric, ctx){
    APLIKASI (state, event, render)
    ================================================================== */
 const state = {model:null, cal:null, depts:null, chans:null, allDepts:[], allChans:[],
-               mode:'full', afterKey:'base', metric:'sales', tab:'ringkasan', cab:'__total', res:null};
+               mode:'full', befFrom:null, befTo:null, aftFrom:null, aftTo:null,
+               metric:'sales', tab:'ringkasan', cab:'__total', res:null};
 const $ = id => document.getElementById(id);
 
 function rangeText(mks){ if (!mks.length) return '–'; return mks.length === 1 ? mkLabel(mks[0]) : mkLabel(mks[0]) + '–' + mkLabel(mks[mks.length-1]); }
 
-function afterMonthsFor(key){
+/* ---------- periode Before / After (per bulan) ---------- */
+// Bulan yang boleh dipilih: bulan berjalan yang belum lengkap hanya di mode Time Gone
+function availableMonths(){
   const cal = state.cal;
-  if (key === 'base') return CONFIG.AFTER_MONTHS.slice();
-  const startI = cal.months.indexOf(CONFIG.AFTER_MONTHS[0]);
-  return startI < 0 ? CONFIG.AFTER_MONTHS.slice() : cal.months.slice(startI);
+  return cal.months.filter(mk => state.mode === 'tg' || cal.current.complete || mk !== cal.current.mk);
 }
+function clampMk(mk, avail){
+  if (avail.includes(mk)) return mk;
+  const prev = avail.filter(m => m <= mk);
+  return prev.length ? prev[prev.length-1] : avail[0];
+}
+// Before tetap (CONFIG.BEFORE_MONTHS); After selalu mulai dari bulan pertama Booster,
+// pengguna hanya memilih bulan akhirnya.
+function afterEndOptions(){ return availableMonths().filter(m => m >= CONFIG.AFTER_MONTHS[0]); }
+function normalizePeriods(){
+  const B = CONFIG.BEFORE_MONTHS, A = CONFIG.AFTER_MONTHS;
+  state.befFrom = B[0]; state.befTo = B[B.length-1]; state.aftFrom = A[0];
+  const opts = afterEndOptions();
+  if (!opts.length){ state.aftTo = A[A.length-1]; return; }
+  state.aftTo = clampMk(state.aftTo || A[A.length-1], opts);
+}
+function periodMonths(from, to){ return availableMonths().filter(m => m >= from && m <= to); }
+function fillPeriodSelects(){
+  const cal = state.cal, start = CONFIG.AFTER_MONTHS[0];
+  $('aftTo').innerHTML = afterEndOptions().map(mk => {
+    const lbl = mk === start ? mkLabelY(mk) : `${mkLabel(start)}–${mkLabel(mk)} ${mk.slice(0,4)}`;
+    const mtd = (mk === cal.current.mk && !cal.current.complete) ? ' (MTD)' : '';
+    return `<option value="${mk}">${lbl}${mtd}</option>`;
+  }).join('');
+  $('aftTo').value = state.aftTo;
+}
+function onPeriodChange(id, value){ state[id] = value; fillPeriodSelects(); render(); }
 
 function context(){
-  const cal = state.cal, aft = afterMonthsFor(state.afterKey).filter(m => cal.months.includes(m));
-  const bef = CONFIG.BEFORE_MONTHS.filter(m => cal.months.includes(m));
+  const cal = state.cal;
+  const aft = periodMonths(state.aftFrom, state.aftTo), bef = periodMonths(state.befFrom, state.befTo);
   const sel = (set, all, word) => set.size === all.length ? 'Semua ' + word : [...set].join(', ');
   return {
-    befRange: rangeText(bef), aftRange: rangeText(aft), befN: bef.length, aftN: aft.length,
+    bef, aft, befRange: rangeText(bef), aftRange: rangeText(aft), befN: bef.length, aftN: aft.length,
     deptText: sel(state.depts, state.allDepts, 'departemen'), chanText: sel(state.chans, state.allChans, 'channel'),
     modeText: state.mode === 'tg' ? `Time Gone ${nf1.format(cal.current.tg*100)}%` : 'Full Month',
     dataPer: dateLabel(cal.lastDate)
@@ -778,15 +810,18 @@ function context(){
 function render(){
   const {model, cal} = state;
   const ctx = context();
-  const res = compute(model, cal, {depts:state.depts, chans:state.chans, mode:state.mode, afterMonths:afterMonthsFor(state.afterKey)});
+  const res = compute(model, cal, {depts:state.depts, chans:state.chans, mode:state.mode, beforeMonths:ctx.bef, afterMonths:ctx.aft});
+  $('hdrSub').textContent = `Pertumbuhan Sales & Active Outlet per Cabang · Before (${ctx.befRange}) vs After (${ctx.aftRange})`;
   state.res = res;
 
   const c = cal.current, curLbl = mkLabelY(c.mk);
   let ctxHtml = `<span>Departemen: <b>${esc(ctx.deptText)}</b></span><span>Channel: <b>${esc(ctx.chanText)}</b></span>`;
   if (state.mode === 'tg'){
     ctxHtml += `<span>Time Gone ${esc(curLbl)}: <b>${nf1.format(c.tg*100)}%</b> (${c.elapsed} dari ${c.total} hari kerja) — setiap bulan dipotong di porsi hari kerja yang sama</span>`;
+    if (!c.complete && c.tg < CONFIG.TG_WARN)
+      ctxHtml += `<span><span class="pill warn">Perhatian</span> Time Gone baru ${nf1.format(c.tg*100)}%: tiap bulan hanya dihitung beberapa hari kerja pertamanya, hasil belum representatif.</span>`;
   } else if (!c.complete){
-    ctxHtml += `<span><span class="pill">MTD</span> ${esc(curLbl)} baru ${c.elapsed} dari ${c.total} hari kerja</span>`;
+    ctxHtml += `<span><span class="pill">MTD</span> ${esc(curLbl)} belum lengkap (${c.elapsed} dari ${c.total} hari kerja), tidak ikut di mode Full Month. Pilih mode Time Gone untuk memasukkannya.</span>`;
   }
   $('context').innerHTML = ctxHtml;
   $('banner').innerHTML = viewBanner(res, ctx);
@@ -852,12 +887,13 @@ function makeMulti(el, opts, getSet, setSet, word, searchable){
 if (typeof document !== 'undefined')
   document.addEventListener('click', () => document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open')));
 
-function setupSeg(id, key){
+function setupSeg(id, key, before){
   $(id).addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     state[key] = b.dataset.v;
     $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
-    render();
+    if (before) before();
+    if (state.model) render();
   });
 }
 
@@ -875,12 +911,9 @@ function initApp(model){
   makeMulti($('ddDept'), state.allDepts, () => state.depts, s => state.depts = s, 'departemen', false);
   makeMulti($('ddChan'), state.allChans, () => state.chans, s => state.chans = s, 'channel', true);
 
-  // periode After
-  const cur = cal.current.mk, lastAfter = CONFIG.AFTER_MONTHS[CONFIG.AFTER_MONTHS.length-1];
-  let opt = `<option value="base">${rangeText(CONFIG.AFTER_MONTHS)} ${CONFIG.AFTER_MONTHS[0].slice(0,4)} (periode Booster)</option>`;
-  if (cur > lastAfter) opt += `<option value="ext">${mkLabel(CONFIG.AFTER_MONTHS[0])}–${mkLabel(cur)} (s.d. bulan berjalan)</option>`;
-  $('selAfter').innerHTML = opt;
-  $('selAfter').value = state.afterKey;
+  // periode Before / After
+  normalizePeriods();
+  fillPeriodSelects();
 
   $('btnModeTG').textContent = `Time Gone ${nf1.format(cal.current.tg*100)}%`;
   $('selCab').innerHTML = `<option value="__total">Grand Total</option>` +
@@ -928,9 +961,9 @@ function loadFile(file){
 }
 
 function boot(){
-  setupSeg('segMode', 'mode');
+  setupSeg('segMode', 'mode', () => { if (state.model){ normalizePeriods(); fillPeriodSelects(); } });
   setupSeg('segMetric', 'metric');
-  $('selAfter').addEventListener('change', e => { state.afterKey = e.target.value; render(); });
+  $('aftTo').addEventListener('change', e => onPeriodChange('aftTo', e.target.value));
   $('selCab').addEventListener('change', e => { state.cab = e.target.value; render(); });
   $('tabs').addEventListener('click', e => {
     const b = e.target.closest('.tab'); if (!b) return;
