@@ -558,8 +558,10 @@ function fmtPct(v){
 }
 const cls = v => (v === null || v === undefined || isNaN(v) || Math.abs(v) < 0.05) ? 'muted' : (v > 0 ? 'pos' : 'neg');
 
-function viewBanner(res, ctx){
-  const t = res.total;
+function viewBanner(res, ctx, row){
+  // row = baris cabang terpilih (tab Trend) atau Grand Total
+  const t = row || res.total;
+  const scope = t.cab === 'Grand Total' ? '' : ` · Cabang ${esc(t.cab)}`;
   const befLbl = 'Before', aftLbl = 'After';
   const card = (title, m, fmt, unitNote, jumlahNote) => `
     <div class="kpi">
@@ -579,9 +581,9 @@ function viewBanner(res, ctx){
     </div>`;
   const s = {...t.sales, befJ:t.sales.befSum, aftJ:t.sales.aftSum};
   const a = {...t.ao, befJ:t.ao.befUniq, aftJ:t.ao.aftUniq};
-  return card('Sales', s, fmtRp, '',
+  return card('Sales' + scope, s, fmtRp, '',
       `Growth dihitung dari rata-rata per bulan. Jumlah = total sales periode (${ctx.befN} vs ${ctx.aftN} bulan, tidak untuk dibandingkan langsung).`) +
-    card('Active Outlet (AO)', a, fmtAO, ' outlet',
+    card('Active Outlet (AO)' + scope, a, fmtAO, ' outlet',
       `Jumlah = outlet unik yang bertransaksi minimal 1x selama periode. Gabungan kedua periode: <b>${nfInt.format(t.ao.allUniq)}</b> outlet unik.`);
 }
 
@@ -816,7 +818,11 @@ function render(){
   state.res = res;
 
   const c = cal.current, curLbl = mkLabelY(c.mk);
+  // Di tab Trend, filter cabang ikut menentukan ringkasan atas
+  const cabRow = (state.tab === 'trend' && state.cab !== '__total') ? res.rows.find(x => x.cab === state.cab) : null;
   let ctxHtml = `<span>Departemen: <b>${esc(ctx.deptText)}</b></span><span>Channel: <b>${esc(ctx.chanText)}</b></span>`;
+  if (state.tab === 'trend')
+    ctxHtml += `<span>Cabang: <b>${cabRow ? esc(cabRow.cab) : (state.cab === '__total' ? 'Grand Total' : esc(state.cab) + ' (tidak ada data untuk filter ini)')}</b></span>`;
   if (state.mode === 'tg'){
     ctxHtml += `<span>Time Gone ${esc(curLbl)}: <b>${nf1.format(c.tg*100)}%</b> (${c.elapsed} dari ${c.total} hari kerja) — setiap bulan dipotong di porsi hari kerja yang sama</span>`;
     if (!c.complete && c.tg < CONFIG.TG_WARN)
@@ -825,7 +831,7 @@ function render(){
     ctxHtml += `<span><span class="pill">MTD</span> ${esc(curLbl)} belum lengkap (${c.elapsed} dari ${c.total} hari kerja), tidak ikut di mode Full Month. Pilih mode Time Gone untuk memasukkannya.</span>`;
   }
   $('context').innerHTML = ctxHtml;
-  $('banner').innerHTML = viewBanner(res, ctx);
+  $('banner').innerHTML = viewBanner(res, ctx, cabRow);
 
   if (state.tab === 'ringkasan'){
     const tb = pickTopBottom(res.rows, state.metric);
