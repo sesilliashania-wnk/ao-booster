@@ -105,6 +105,9 @@
   tr.top td:first-child{box-shadow:inset 3px 0 0 var(--pos)}
   tr.bot td:first-child{box-shadow:inset 3px 0 0 var(--neg)}
   tr.total td{font-weight:700;background:var(--surface-2);border-top:2px solid var(--line-2)}
+  tr.sel td, tbody tr.sel:hover td{background:var(--current)}
+  #ddCab .dd-btn{min-width:150px}
+  tr.subtotal td{font-weight:700;background:var(--current);border-top:2px solid var(--line-2)}
   .sep{border-left:1px solid var(--line)}
   .rk{color:var(--ink-3);font-weight:600}
   .chip{display:inline-block;font-size:11px;font-weight:650;padding:1px 7px;border-radius:999px}
@@ -188,8 +191,7 @@
         <button data-v="ao" aria-pressed="false">AO Growth</button>
       </div>
     </div>
-    <div class="f hidden" id="fCab"><label for="selCab">Cabang</label>
-      <select class="sel" id="selCab"></select>
+    <div class="f" id="fCab"><span class="lbl">Cabang</span><div class="dd" id="ddCab"></div>
     </div>
   </div>
 
@@ -521,7 +523,20 @@ function compute(model, cal, opts){
     rows.push({cab: cabs[c], ...build(sM, aM, uniqB[c], uniqA[c], uniqAll[c])});
   }
   const total = {cab:'Grand Total', ...build(totS, totA, tUB, tUA, tUAll)};
-  return {rows, total, months, cut, befIdx:bef, aftIdx:aft};
+
+  // Gabungan beberapa cabang. Outlet dikunci per cabang (cabang|KODELANG), jadi AO
+  // dan outlet unik antar cabang tidak pernah tumpang tindih: penjumlahan tetap distinct.
+  function combine(list, label){
+    const S = new Array(nM).fill(0), A = new Array(nM).fill(0);
+    let uB = 0, uA = 0, uAll = 0;
+    for (const name of list){
+      const c = cabIdx.get(name); if (c === undefined || !hasRow[c]) continue;
+      for (let m = 0; m < nM; m++){ S[m] += sales[c*nM + m]; A[m] += ao[c*nM + m]; }
+      uB += uniqB[c]; uA += uniqA[c]; uAll += uniqAll[c];
+    }
+    return {cab: label, group: true, ...build(S, A, uB, uA, uAll)};
+  }
+  return {rows, total, combine, months, cut, befIdx:bef, aftIdx:aft};
 }
 /*ENGINE-END*/
 
@@ -561,7 +576,7 @@ const cls = v => (v === null || v === undefined || isNaN(v) || Math.abs(v) < 0.0
 function viewBanner(res, ctx, row){
   // row = baris cabang terpilih (tab Trend) atau Grand Total
   const t = row || res.total;
-  const scope = t.cab === 'Grand Total' ? '' : ` · Cabang ${esc(t.cab)}`;
+  const scope = t.cab === 'Grand Total' ? '' : ` · ${t.group ? esc(t.cab) : 'Cabang ' + esc(t.cab)}`;
   const befLbl = 'Before', aftLbl = 'After';
   const card = (title, m, fmt, unitNote, jumlahNote) => `
     <div class="kpi">
@@ -641,7 +656,8 @@ function niceStep(raw){
   return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
 }
 
-function viewRankTable(res, metric, tb){
+function viewRankTable(res, metric, tb, selSet, subRow){
+  selSet = selSet || new Set();
   const rows = [...res.rows].sort((p,q) => {
     const a = p[metric].growth, b = q[metric].growth;
     if (a === null) return 1; if (b === null) return -1; return b - a;
@@ -663,7 +679,8 @@ function viewRankTable(res, metric, tb){
       <th class="n sep">Before</th><th class="n">After</th><th class="n">Gap</th><th class="n">Growth${metric==='ao'?' ▾':''}</th>
       <th class="n sep">Before</th><th class="n">After</th><th class="n">Gap</th><th class="n">Growth${metric==='sales'?' ▾':''}</th></tr>
     </thead><tbody>`;
-  rows.forEach((r,i) => { h += line(r, i+1, topSet.has(r.cab) ? 'top' : botSet.has(r.cab) ? 'bot' : ''); });
+  rows.forEach((r,i) => { h += line(r, i+1, (topSet.has(r.cab) ? 'top' : botSet.has(r.cab) ? 'bot' : '') + (selSet.has(r.cab) ? ' sel' : '')); });
+  if (subRow && subRow.group) h += line({...subRow, cab:'Subtotal ' + subRow.cab}, 'Σ', 'subtotal');
   h += line(res.total, '', 'total').replace('<td class="rk"></td>', '<td class="rk">Σ</td>');
   return h + '</tbody></table>';
 }
@@ -738,19 +755,20 @@ function viewMatrix(r, res, cal, mode){
   return h + '</tbody></table>';
 }
 
-function buildExportCSV(res, metric, ctx){
+function buildExportCSV(res, metric, ctx, subRow){
   const rows = [...res.rows].sort((p,q) => {
     const a = p[metric].growth, b = q[metric].growth;
     if (a === null) return 1; if (b === null) return -1; return b - a;
   });
   const n = (v, d) => (v === null || isNaN(v)) ? '' : (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d).replace('.', ',');
   const lines = [];
-  lines.push(['Filter', `Dept: ${ctx.deptText} | Channel: ${ctx.chanText} | Mode: ${ctx.modeText} | Before: ${ctx.befRange} | After: ${ctx.aftRange} | Data per: ${ctx.dataPer}`].join(';'));
+  lines.push(['Filter', `Dept: ${ctx.deptText} | Channel: ${ctx.chanText} | Cabang: ${ctx.cabText || 'Semua cabang'} | Mode: ${ctx.modeText} | Before: ${ctx.befRange} | After: ${ctx.aftRange} | Data per: ${ctx.dataPer}`].join(';'));
   lines.push(['Rank','Cabang','Avg AO Before','Avg AO After','AO Gap','AO Growth %','Jumlah AO Unik Before','Jumlah AO Unik After',
               'Avg Sales Before','Avg Sales After','Sales Gap','Sales Growth %','Jumlah Sales Before','Jumlah Sales After'].join(';'));
   const out = (r, rank) => [rank, r.cab, n(r.ao.bef,0), n(r.ao.aft,0), n(r.ao.gap,0), n(r.ao.growth,2), r.ao.befUniq, r.ao.aftUniq,
       n(r.sales.bef,0), n(r.sales.aft,0), n(r.sales.gap,0), n(r.sales.growth,2), n(r.sales.befSum,0), n(r.sales.aftSum,0)].join(';');
   rows.forEach((r,i) => lines.push(out(r, i+1)));
+  if (subRow && subRow.group) lines.push(out({...subRow, cab:'Subtotal ' + subRow.cab}, ''));
   lines.push(out(res.total, ''));
   return '﻿' + lines.join('\r\n');
 }
@@ -760,7 +778,7 @@ function buildExportCSV(res, metric, ctx){
    ================================================================== */
 const state = {model:null, cal:null, depts:null, chans:null, allDepts:[], allChans:[],
                mode:'full', befFrom:null, befTo:null, aftFrom:null, aftTo:null,
-               metric:'sales', tab:'ringkasan', cab:'__total', res:null};
+               metric:'sales', tab:'ringkasan', cabs:null, allCabs:[], res:null};
 const $ = id => document.getElementById(id);
 
 function rangeText(mks){ if (!mks.length) return '–'; return mks.length === 1 ? mkLabel(mks[0]) : mkLabel(mks[0]) + '–' + mkLabel(mks[mks.length-1]); }
@@ -805,6 +823,7 @@ function context(){
   return {
     bef, aft, befRange: rangeText(bef), aftRange: rangeText(aft), befN: bef.length, aftN: aft.length,
     deptText: sel(state.depts, state.allDepts, 'departemen'), chanText: sel(state.chans, state.allChans, 'channel'),
+    cabText: state.cabs.size === state.allCabs.length ? 'Semua cabang' : [...state.cabs].sort().join(', '),
     modeText: state.mode === 'tg' ? `Time Gone ${nf1.format(cal.current.tg*100)}%` : 'Full Month',
     dataPer: dateLabel(cal.lastDate)
   };
@@ -818,11 +837,18 @@ function render(){
   state.res = res;
 
   const c = cal.current, curLbl = mkLabelY(c.mk);
-  // Di tab Trend, filter cabang ikut menentukan ringkasan atas
-  const cabRow = (state.tab === 'trend' && state.cab !== '__total') ? res.rows.find(x => x.cab === state.cab) : null;
+  // Filter cabang (multi-select) menentukan ringkasan atas & trend di kedua tab
+  const allCab = state.cabs.size === state.allCabs.length;
+  const picked = [...state.cabs].sort();
+  const withData = picked.filter(cb => res.rows.some(r => r.cab === cb));
+  const noData = picked.filter(cb => !withData.includes(cb));
+  let cabRow = null;
+  if (!allCab && withData.length === 1) cabRow = res.rows.find(r => r.cab === withData[0]);
+  else if (!allCab && withData.length > 1) cabRow = res.combine(withData, withData.length + ' cabang');
+  state.cabRow = cabRow;
   let ctxHtml = `<span>Departemen: <b>${esc(ctx.deptText)}</b></span><span>Channel: <b>${esc(ctx.chanText)}</b></span>`;
-  if (state.tab === 'trend')
-    ctxHtml += `<span>Cabang: <b>${cabRow ? esc(cabRow.cab) : (state.cab === '__total' ? 'Grand Total' : esc(state.cab) + ' (tidak ada data untuk filter ini)')}</b></span>`;
+  ctxHtml += `<span>Cabang: <b>${allCab ? 'Semua cabang (Grand Total)' : esc(picked.join(', '))}</b>` +
+    (noData.length ? ` <span class="muted">(${esc(noData.join(', '))} tidak ada data untuk filter ini)</span>` : '') + `</span>`;
   if (state.mode === 'tg'){
     ctxHtml += `<span>Time Gone ${esc(curLbl)}: <b>${nf1.format(c.tg*100)}%</b> (${c.elapsed} dari ${c.total} hari kerja) — setiap bulan dipotong di porsi hari kerja yang sama</span>`;
     if (!c.complete && c.tg < CONFIG.TG_WARN)
@@ -837,13 +863,14 @@ function render(){
     const tb = pickTopBottom(res.rows, state.metric);
     $('chartTitle').textContent = `Bottom 3 & Top 3 Cabang — ${state.metric === 'sales' ? 'Sales Growth' : 'AO Growth'}`;
     $('chartTopBottom').innerHTML = viewTopBottomChart(tb, state.metric);
-    $('rankTable').innerHTML = viewRankTable(res, state.metric, tb);
+    $('rankTable').innerHTML = viewRankTable(res, state.metric, tb, allCab ? null : new Set(withData), cabRow);
     $('rankDesc').textContent = `Rata-rata per bulan, Before ${ctx.befRange} vs After ${ctx.aftRange}. Diurutkan berdasarkan ${state.metric === 'sales' ? 'Sales' : 'AO'} Growth. Grand Total di baris paling bawah.`;
   } else {
-    const r = state.cab === '__total' ? res.total : (res.rows.find(x => x.cab === state.cab) || res.total);
+    const r = cabRow || res.total;
     $('chartSales').innerHTML = viewLineChart(r.sales.months, res, cal, fmtRp, '#0f6b4f');
     $('chartAO').innerHTML = viewLineChart(r.ao.months, res, cal, v => fmtAO(v), '#2f5fa8');
-    $('trendSalesDesc').textContent = `${r.cab === 'Grand Total' ? 'Grand Total (semua cabang)' : 'Cabang ' + r.cab} · sales net (termasuk retur)` +
+    const who = r.cab === 'Grand Total' ? 'Grand Total (semua cabang)' : r.group ? 'Gabungan ' + withData.join(', ') : 'Cabang ' + r.cab;
+    $('trendSalesDesc').textContent = `${who} · sales net (termasuk retur)` +
       (state.mode === 'tg' ? ` · dipotong di Time Gone ${nf1.format(c.tg*100)}%` : '');
     $('matrix').innerHTML = viewMatrix(r, res, cal, state.mode);
     $('matrixDesc').textContent = state.mode === 'tg'
@@ -923,8 +950,9 @@ function initApp(model){
   fillPeriodSelects();
 
   $('btnModeTG').textContent = `Time Gone ${nf1.format(cal.current.tg*100)}%`;
-  $('selCab').innerHTML = `<option value="__total">Grand Total</option>` +
-    [...new Set(model.rowCab)].sort().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  state.allCabs = [...new Set(model.rowCab)].sort();
+  state.cabs = new Set(state.allCabs);
+  makeMulti($('ddCab'), state.allCabs, () => state.cabs, s => state.cabs = s, 'cabang', true);
 
   const st = $('stamp');
   st.innerHTML = `Data per <b>${dateLabel(cal.lastDate)}</b>`;
@@ -971,7 +999,6 @@ function boot(){
   setupSeg('segMode', 'mode', () => { if (state.model){ normalizePeriods(); fillPeriodSelects(); } });
   setupSeg('segMetric', 'metric');
   $('aftTo').addEventListener('change', e => onPeriodChange('aftTo', e.target.value));
-  $('selCab').addEventListener('change', e => { state.cab = e.target.value; render(); });
   $('tabs').addEventListener('click', e => {
     const b = e.target.closest('.tab'); if (!b) return;
     state.tab = b.dataset.tab;
@@ -979,7 +1006,6 @@ function boot(){
     $('tabRingkasan').classList.toggle('hidden', state.tab !== 'ringkasan');
     $('tabTrend').classList.toggle('hidden', state.tab !== 'trend');
     $('fMetric').classList.toggle('hidden', state.tab !== 'ringkasan');
-    $('fCab').classList.toggle('hidden', state.tab !== 'trend');
     if (state.model) render();
   });
   $('btnLoadFile').addEventListener('click', () => $('fileInput').click());
@@ -991,7 +1017,7 @@ function boot(){
   dz.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
   $('btnExport').addEventListener('click', () => {
     if (!state.res) return;
-    const csv = buildExportCSV(state.res, state.metric, context());
+    const csv = buildExportCSV(state.res, state.metric, context(), state.cabRow);
     const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
     const a = document.createElement('a');
     a.href = url; a.download = `ao_booster_ringkasan_${state.cal.lastDate.iso}.csv`;
